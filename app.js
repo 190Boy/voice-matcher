@@ -1,5 +1,5 @@
 import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.0';
-// ?? 就是新增下面這一行，讓程式直接把比對工具抓進來！
+// 匯入字串相似度比對工具
 import stringSimilarity from 'https://esm.sh/string-similarity@4.0.2';
 
 // 配置環境
@@ -40,7 +40,7 @@ startBtn.addEventListener('click', async () => {
 
     try {
         // Step 1: 解析 CSV
-        statusHeader.textContent = "?? 正在解析文本資料...";
+        statusHeader.textContent = "📄 正在解析文本資料...";
         const csvContent = await csvFileInput.files[0].text();
         Papa.parse(csvContent, {
             skipEmptyLines: true,
@@ -51,22 +51,22 @@ startBtn.addEventListener('click', async () => {
         log(`讀取到 ${textList.length} 句文本。`);
 
         // Step 2: 載入 AI 模型
-        statusHeader.textContent = "?? 正在載入 AI 模型 (Whisper-base)...";
+        statusHeader.textContent = "🤖 正在載入 AI 模型 (Whisper-base)...";
         const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-base', {
             progress_callback: (info) => {
                 if (info.status === 'downloading') {
                     updateProgress(info.progress);
-                    statusHeader.textContent = `? 下載模型資源中... ${Math.round(info.progress)}%`;
+                    statusHeader.textContent = `⏳ 下載模型資源中... ${Math.round(info.progress)}%`;
                 }
                 if (info.status === 'ready') {
-                    statusHeader.textContent = "? 模型已就緒，準備開始辨識。";
+                    statusHeader.textContent = "✅ 模型已就緒，準備開始辨識。";
                     updateProgress(100);
                 }
             }
         });
 
         // Step 3: 解壓縮音檔
-        statusHeader.textContent = "?? 解壓縮語音包...";
+        statusHeader.textContent = "📦 解壓縮語音包...";
         const zip = new JSZip();
         const folder = await zip.loadAsync(zipFileInput.files[0]);
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
@@ -80,7 +80,7 @@ startBtn.addEventListener('click', async () => {
         // Step 4: 循環處理
         for (let i = 0; i < audioFiles.length; i++) {
             const fileName = audioFiles[i];
-            statusHeader.textContent = `?? 正在辨識 (${i+1}/${audioFiles.length})`;
+            statusHeader.textContent = `🎧 正在辨識 (${i+1}/${audioFiles.length})`;
             log(`處理中: ${fileName}`);
 
             const arrayBuffer = await folder.files[fileName].async("arraybuffer");
@@ -109,14 +109,14 @@ startBtn.addEventListener('click', async () => {
         }
 
         // Step 5: 下載結果
-        statusHeader.textContent = "? 任務完成！";
+        statusHeader.textContent = "🎉 任務完成！";
         const finalCsv = Papa.unparse(matchResults);
         const blob = new Blob(["\ufeff" + finalCsv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
-        resultSection.innerHTML = `<a href="${url}" download="Matching_Result.csv" class="btn-success">?? 下載配對結果 CSV</a>`;
+        resultSection.innerHTML = `<a href="${url}" download="Matching_Result.csv" class="btn-success">⬇️ 下載配對結果 CSV</a>`;
 
     } catch (err) {
-        statusHeader.textContent = "? 發生錯誤";
+        statusHeader.textContent = "❌ 發生錯誤";
         log(err.message);
     } finally {
         startBtn.disabled = false;
