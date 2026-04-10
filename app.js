@@ -1,5 +1,5 @@
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@xenova/transformers@2.17.0';
-// 匯入字串相似度比對工具
+// 🌟 關鍵 1：換成支援 WebGPU 的 V3 最新版引擎！
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0-beta.2';
 import stringSimilarity from 'https://esm.sh/string-similarity@4.0.2';
 
 // 配置環境
@@ -7,7 +7,6 @@ env.allowLocalModels = false;
 
 // 綁定 UI 元素
 const csvFileInput = document.getElementById('csvFile');
-// 這裡改成綁定 folderFile
 const folderFileInput = document.getElementById('folderFile'); 
 const startBtn = document.getElementById('startBtn');
 const statusHeader = document.getElementById('statusHeader');
@@ -52,9 +51,10 @@ startBtn.addEventListener('click', async () => {
         });
         log(`讀取到 ${textList.length} 句文本。`);
 
-        // Step 2: 載入 AI 模型
-        statusHeader.textContent = "🤖 正在載入 AI 模型 (Whisper-base)...";
+        // Step 2: 載入 AI 模型 (🚀 啟用 WebGPU 加速)
+        statusHeader.textContent = "🤖 正在載入 AI 模型 (Whisper-base 顯示卡加速版)...";
         const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-base', {
+            device: 'webgpu', // 🌟 關鍵 2：召喚顯示卡的終極密碼
             progress_callback: (info) => {
                 if (info.status === 'downloading') {
                     updateProgress(info.progress);
@@ -67,26 +67,24 @@ startBtn.addEventListener('click', async () => {
             }
         });
 
-        // Step 3: 直接讀取本地資料夾 (再也不用解壓縮啦！)
+        // Step 3: 直接讀取本地資料夾
         statusHeader.textContent = "📁 讀取資料夾音檔...";
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
         
-        // 將使用者選取的檔案轉成陣列，並過濾出 wav 和 mp3
         const allFiles = Array.from(folderFileInput.files);
         const audioFiles = allFiles.filter(file => 
             file.name.toLowerCase().endsWith('.wav') || file.name.toLowerCase().endsWith('.mp3')
         );
 
-        if (audioFiles.length === 0) throw new Error("資料夾內沒有找到無效的音檔。");
+        if (audioFiles.length === 0) throw new Error("資料夾內沒有找到有效的音檔。");
 
         // Step 4: 循環處理
         for (let i = 0; i < audioFiles.length; i++) {
-            const file = audioFiles[i]; // 這裡直接拿到本地 File 物件
+            const file = audioFiles[i]; 
             const fileName = file.name;
             statusHeader.textContent = `🎧 正在辨識 (${i+1}/${audioFiles.length})`;
             log(`處理中: ${fileName}`);
 
-            // 直接讀取 File 為 arrayBuffer (速度比解壓縮快很多！)
             const arrayBuffer = await file.arrayBuffer();
             const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
             const float32Data = audioBuffer.getChannelData(0);
@@ -120,7 +118,7 @@ startBtn.addEventListener('click', async () => {
         resultSection.innerHTML = `<a href="${url}" download="Matching_Result.csv" class="btn-success">⬇️ 下載配對結果 CSV</a>`;
 
     } catch (err) {
-        statusHeader.textContent = "❌ 發生錯誤";
+        statusHeader.textContent = "❌ 發生錯誤 (可能是瀏覽器不支援 WebGPU)";
         log(err.message);
     } finally {
         startBtn.disabled = false;
