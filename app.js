@@ -7,7 +7,8 @@ env.allowLocalModels = false;
 
 // 綁定 UI 元素
 const csvFileInput = document.getElementById('csvFile');
-const zipFileInput = document.getElementById('zipFile');
+// 這裡改成綁定 folderFile
+const folderFileInput = document.getElementById('folderFile'); 
 const startBtn = document.getElementById('startBtn');
 const statusHeader = document.getElementById('statusHeader');
 const statusLog = document.getElementById('statusLog');
@@ -27,8 +28,9 @@ function updateProgress(percent) {
 }
 
 startBtn.addEventListener('click', async () => {
-    if (!csvFileInput.files[0] || !zipFileInput.files[0]) {
-        alert("請確認已上傳 CSV 與 ZIP 檔案！");
+    // 檢查有沒有選取資料夾
+    if (!csvFileInput.files[0] || folderFileInput.files.length === 0) {
+        alert("請確認已上傳 CSV 並選擇了語音資料夾！");
         return;
     }
 
@@ -65,25 +67,27 @@ startBtn.addEventListener('click', async () => {
             }
         });
 
-        // Step 3: 解壓縮音檔
-        statusHeader.textContent = "📦 解壓縮語音包...";
-        const zip = new JSZip();
-        const folder = await zip.loadAsync(zipFileInput.files[0]);
+        // Step 3: 直接讀取本地資料夾 (再也不用解壓縮啦！)
+        statusHeader.textContent = "📁 讀取資料夾音檔...";
         const audioCtx = new (window.AudioContext || window.webkitAudioContext)({ sampleRate: 16000 });
         
-        const audioFiles = Object.keys(folder.files).filter(name => 
-            name.toLowerCase().endsWith('.wav') || name.toLowerCase().endsWith('.mp3')
+        // 將使用者選取的檔案轉成陣列，並過濾出 wav 和 mp3
+        const allFiles = Array.from(folderFileInput.files);
+        const audioFiles = allFiles.filter(file => 
+            file.name.toLowerCase().endsWith('.wav') || file.name.toLowerCase().endsWith('.mp3')
         );
 
-        if (audioFiles.length === 0) throw new Error("ZIP 內無效音檔。");
+        if (audioFiles.length === 0) throw new Error("資料夾內沒有找到無效的音檔。");
 
         // Step 4: 循環處理
         for (let i = 0; i < audioFiles.length; i++) {
-            const fileName = audioFiles[i];
+            const file = audioFiles[i]; // 這裡直接拿到本地 File 物件
+            const fileName = file.name;
             statusHeader.textContent = `🎧 正在辨識 (${i+1}/${audioFiles.length})`;
             log(`處理中: ${fileName}`);
 
-            const arrayBuffer = await folder.files[fileName].async("arraybuffer");
+            // 直接讀取 File 為 arrayBuffer (速度比解壓縮快很多！)
+            const arrayBuffer = await file.arrayBuffer();
             const audioBuffer = await audioCtx.decodeAudioData(arrayBuffer);
             const float32Data = audioBuffer.getChannelData(0);
 
