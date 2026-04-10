@@ -1,4 +1,4 @@
-// 🌟 關鍵 1：換成支援 WebGPU 的 V3 最新版引擎！
+// 🌟 1. 使用支援 WebGPU 的最新 V3 引擎
 import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers';
 import stringSimilarity from 'https://esm.sh/string-similarity@4.0.2';
 
@@ -51,12 +51,15 @@ startBtn.addEventListener('click', async () => {
         });
         log(`讀取到 ${textList.length} 句文本。`);
 
-        // Step 2: 載入 AI 模型 (🚀 啟用 WebGPU 加速)
+        // Step 2: 載入 AI 模型 
         statusHeader.textContent = "🤖 正在載入 AI 模型 (Whisper-base 顯示卡加速版)...";
-        const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
+        
+        // 🌟 2. 使用 base 模型，並開啟 webgpu 加速
+        const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-base', {
+            device: 'webgpu', 
             progress_callback: (info) => {
-                // 🌟 把 downloading 改成 progress 就修好了！
-                if (info.status === 'progress') {
+                // 🌟 3. 正確的 progress 狀態碼，進度條完美復活！
+                if (info.status === 'progress') { 
                     updateProgress(info.progress);
                     statusHeader.textContent = `⏳ 下載模型資源中... ${Math.round(info.progress)}%`;
                 }
@@ -118,7 +121,7 @@ startBtn.addEventListener('click', async () => {
         resultSection.innerHTML = `<a href="${url}" download="Matching_Result.csv" class="btn-success">⬇️ 下載配對結果 CSV</a>`;
 
     } catch (err) {
-        statusHeader.textContent = "❌ 發生錯誤 (可能是瀏覽器不支援 WebGPU)";
+        statusHeader.textContent = "❌ 發生錯誤";
         log(err.message);
     } finally {
         startBtn.disabled = false;
