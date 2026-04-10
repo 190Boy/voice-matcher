@@ -53,10 +53,10 @@ startBtn.addEventListener('click', async () => {
 
         // Step 2: 載入 AI 模型 (🚀 啟用 WebGPU 加速)
         statusHeader.textContent = "🤖 正在載入 AI 模型 (Whisper-base 顯示卡加速版)...";
-        const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-base', {
-            device: 'webgpu', // 🌟 關鍵 2：召喚顯示卡的終極密碼
+        const transcriber = await pipeline('automatic-speech-recognition', 'Xenova/whisper-tiny', {
             progress_callback: (info) => {
-                if (info.status === 'downloading') {
+                // 🌟 把 downloading 改成 progress 就修好了！
+                if (info.status === 'progress') {
                     updateProgress(info.progress);
                     statusHeader.textContent = `⏳ 下載模型資源中... ${Math.round(info.progress)}%`;
                 }
