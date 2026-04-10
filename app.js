@@ -1,5 +1,5 @@
 // 🌟 關鍵 1：換成支援 WebGPU 的 V3 最新版引擎！
-import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.0.0-beta.2';
+import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers';
 import stringSimilarity from 'https://esm.sh/string-similarity@4.0.2';
 
 // 配置環境
