@@ -1,61 +1,39 @@
-<!DOCTYPE html>
-<html lang="zh-TW">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 語音文本自動配對工具</title>
-    <link rel="stylesheet" href="style.css">
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.4.1/papaparse.min.js"></script>
-    <script src="https://unpkg.com/string-similarity@4.0.2/dist/string-similarity.min.js"></script>
-</head>
-<body>
-
-<div class="container">
-    <header>
-        <h1>🎮 語音文本自動配對工具</h1>
-        <p>專為本地化與開發者設計，純瀏覽器運算，隱私無虞。</p>
-    </header>
-
-    <main class="card">
-        <section class="upload-section">
-            <div class="form-group">
-                <label>1. 上傳文本表 (CSV)</label>
-                <div class="file-input-wrapper">
-                    <input type="file" id="csvFile" accept=".csv">
-                </div>
-                <small>程式會讀取 CSV 的第一欄作為比對基準。</small>
-            </div>
-
-            <div class="form-group">
-                <label>2. 選擇語音資料夾 (免壓縮直接讀取)</label>
-                <div class="file-input-wrapper">
-                    <input type="file" id="folderFile" webkitdirectory directory multiple>
-                </div>
-                <small>點擊後選擇包含 .wav 或 .mp3 的資料夾即可。</small>
-            </div>
-        </section>
-
-        <section class="action-section">
-            <button id="startBtn" class="btn-primary">開始 AI 匹配任務</button>
-        </section>
-
-        <section id="statusContainer" class="status-container">
-            <div id="statusHeader">等待操作中...</div>
-            <div id="progressWrapper" class="progress-wrapper" style="display:none;">
-                <div id="progressBar" class="progress-bar"></div>
-            </div>
-            <div id="statusLog" class="status-log"></div>
-        </section>
-
-        <section id="resultSection" class="result-section"></section>
-    </main>
-
-    <footer>
-        <p>首次執行將下載 whisper-base 模型 (140MB)，下載後將存於瀏覽器快取中。</p>
-    </footer>
+<div class="form-group">
+    <label>1. 選擇工作模式</label>
+    <div style="margin-bottom: 15px; background: #f8f9fa; padding: 10px; border-radius: 5px;">
+        <label style="cursor: pointer; margin-right: 15px;">
+            <input type="radio" name="workMode" value="modeA" id="modeA"> 
+            <strong>A. 純語音轉文字</strong> (僅輸出檔名與繁體文字)
+        </label>
+        <br>
+        <label style="cursor: pointer;">
+            <input type="radio" name="workMode" value="modeB" id="modeB" checked> 
+            <strong>B. 語音轉文字 + 文本比對</strong> (需上傳對照 CSV)
+        </label>
+    </div>
 </div>
 
-<script type="module" src="app.js"></script>
-</body>
-</html>
+<div class="form-group">
+    <label>2. 選擇 AI 語音模型</label>
+    <select id="modelSelect" style="width: 100%; padding: 8px; border-radius: 4px; border: 1px solid #ccc; margin-bottom: 15px;">
+        <option value="Xenova/whisper-tiny">Whisper-Tiny (約 40 MB) - 極速，但較易有錯字</option>
+        <option value="Xenova/whisper-base" selected>Whisper-Base (約 140 MB) - 速度與精準度平衡</option>
+        <option value="Xenova/whisper-small">Whisper-Small (約 500 MB) - 高精準度，速度較慢</option>
+        <option value="Xenova/whisper-large-v2">Whisper-Large (約 3 GB) - 極限精準，極度消耗效能與網路</option>
+    </select>
+</div>
+
+<div class="form-group" id="csvUploadBlock">
+    <label>3. 上傳遊戲台詞文本 (CSV 格式)</label>
+    <div class="file-input-wrapper">
+        <input type="file" id="csvFile" accept=".csv">
+    </div>
+    <small>請確保第一欄為文本台詞。</small>
+</div>
+
+<div class="form-group">
+    <label>4. 選擇語音資料夾 (免壓縮直接讀取)</label>
+    <div class="file-input-wrapper">
+        <input type="file" id="folderFile" webkitdirectory directory multiple>
+    </div>
+</div>
