@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 語音自動配對工具 - WebGPU 專用版</title>
+    <title>AI 語音自動配對工具 - WebGPU 評分版</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
 
@@ -14,6 +14,8 @@
             --card-bg: rgba(22, 27, 34, 0.8);
             --danger: #ff6b6b;
             --warning: #ffd166;
+            --muted: #8b949e;
+            --spin-speed: 1.2s;
         }
 
         body {
@@ -28,7 +30,7 @@
 
         .container {
             width: 100%;
-            max-width: 800px;
+            max-width: 860px;
             background: var(--card-bg);
             padding: 30px;
             border-radius: 15px;
@@ -43,21 +45,11 @@
             text-transform: uppercase;
             letter-spacing: 2px;
             text-shadow: 0 0 10px rgba(0, 255, 204, 0.5);
-        }
-
-        .form-group {
-            margin-bottom: 25px;
-        }
-
-        label {
-            display: block;
-            margin-bottom: 10px;
-            font-weight: bold;
-            color: var(--neon-green);
+            margin-bottom: 18px;
         }
 
         .webgpu-status {
-            margin: 18px 0 26px;
+            margin: 18px 0 18px;
             padding: 14px 16px;
             border-radius: 10px;
             background: rgba(0, 0, 0, 0.35);
@@ -83,6 +75,109 @@
             border-color: rgba(255, 209, 102, 0.65);
         }
 
+        .score-panel {
+            display: none;
+            margin: 0 0 26px;
+            padding: 18px;
+            border-radius: 12px;
+            border: 1px solid rgba(0, 255, 204, 0.25);
+            background: rgba(0, 0, 0, 0.28);
+        }
+
+        .score-top {
+            display: grid;
+            grid-template-columns: 90px 1fr;
+            gap: 18px;
+            align-items: center;
+        }
+
+        .score-spinner {
+            width: 74px;
+            height: 74px;
+            border-radius: 50%;
+            border: 6px solid rgba(0, 255, 204, 0.18);
+            border-top-color: var(--neon-green);
+            box-shadow: 0 0 18px rgba(0, 255, 204, 0.28);
+            animation: spin var(--spin-speed) linear infinite;
+        }
+
+        @keyframes spin {
+            to { transform: rotate(360deg); }
+        }
+
+        .score-number {
+            font-size: 32px;
+            font-weight: 900;
+            color: var(--neon-green);
+            margin-bottom: 8px;
+        }
+
+        .score-desc {
+            color: #c9d1d9;
+            line-height: 1.7;
+            font-size: 14px;
+        }
+
+        .score-bar {
+            height: 10px;
+            border-radius: 99px;
+            background: #161b22;
+            border: 1px solid #30363d;
+            overflow: hidden;
+            margin-top: 14px;
+        }
+
+        .score-bar-inner {
+            height: 100%;
+            width: 0%;
+            background: linear-gradient(90deg, #00ffcc, #2f81f7);
+            box-shadow: 0 0 12px rgba(0, 255, 204, 0.45);
+            transition: width 0.4s ease;
+        }
+
+        .score-grid {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+            margin-top: 14px;
+        }
+
+        .score-card {
+            background: rgba(13, 17, 23, 0.72);
+            border: 1px solid #30363d;
+            border-radius: 10px;
+            padding: 10px 12px;
+            color: #c9d1d9;
+            font-size: 13px;
+        }
+
+        .score-card strong {
+            display: block;
+            color: var(--neon-green);
+            font-size: 17px;
+            margin-top: 4px;
+        }
+
+        @media (max-width: 720px) {
+            .score-top {
+                grid-template-columns: 1fr;
+                text-align: center;
+                justify-items: center;
+            }
+            .score-grid {
+                grid-template-columns: 1fr;
+            }
+        }
+
+        .form-group { margin-bottom: 25px; }
+
+        label {
+            display: block;
+            margin-bottom: 10px;
+            font-weight: bold;
+            color: var(--neon-green);
+        }
+
         .mode-container {
             background: rgba(0, 0, 0, 0.4);
             padding: 20px;
@@ -100,9 +195,7 @@
             transition: 0.3s;
         }
 
-        .mode-option:hover {
-            background: rgba(0, 255, 204, 0.1);
-        }
+        .mode-option:hover { background: rgba(0, 255, 204, 0.1); }
 
         input[type="radio"] {
             accent-color: var(--neon-green);
@@ -137,9 +230,7 @@
             background: rgba(0, 255, 204, 0.05);
         }
 
-        input[type="file"] {
-            color: #8b949e;
-        }
+        input[type="file"] { color: var(--muted); }
 
         button {
             width: 100%;
@@ -223,8 +314,27 @@
         <h1>🎙️ AI Audio Lab</h1>
 
         <div id="webgpuStatus" class="webgpu-status checking">
-            正在檢查 WebGPU 支援狀態...
+            正在檢查 WebGPU 支援狀態與目前電腦效能...
         </div>
+
+        <section id="scorePanel" class="score-panel">
+            <div class="score-top">
+                <div class="score-spinner" id="scoreSpinner" title="評分越高，轉速越快"></div>
+                <div>
+                    <div class="score-number" id="scoreNumber">-- / 100</div>
+                    <div class="score-desc" id="scoreDesc">正在評估目前裝置...</div>
+                    <div class="score-bar">
+                        <div class="score-bar-inner" id="scoreBar"></div>
+                    </div>
+                </div>
+            </div>
+
+            <div class="score-grid">
+                <div class="score-card">CPU 邏輯核心<strong id="scoreCores">--</strong></div>
+                <div class="score-card">記憶體估計<strong id="scoreMemory">--</strong></div>
+                <div class="score-card">WebGPU 測試耗時<strong id="scoreBench">--</strong></div>
+            </div>
+        </section>
 
         <div class="form-group">
             <label>1. 選擇工作模式</label>
@@ -284,6 +394,15 @@
         const statusHeader = document.getElementById('statusHeader');
         const statusLog = document.getElementById('statusLog');
 
+        const scorePanel = document.getElementById('scorePanel');
+        const scoreNumber = document.getElementById('scoreNumber');
+        const scoreDesc = document.getElementById('scoreDesc');
+        const scoreBar = document.getElementById('scoreBar');
+        const scoreCores = document.getElementById('scoreCores');
+        const scoreMemory = document.getElementById('scoreMemory');
+        const scoreBench = document.getElementById('scoreBench');
+        const modelSelect = document.getElementById('modelSelect');
+
         function log(message) {
             const time = new Date().toLocaleTimeString();
             statusLog.innerHTML += `[${time}] ${message}<br>`;
@@ -299,7 +418,164 @@
             log('WebGPU 檢查失敗，已停止載入 app.js。');
         }
 
-        async function checkWebGPU() {
+        function clamp(value, min, max) {
+            return Math.max(min, Math.min(max, value));
+        }
+
+        function applyScoreToUI({ score, cores, memory, benchMs, recommendedModel, label }) {
+            scorePanel.style.display = 'block';
+
+            const speed =
+                score >= 85 ? '0.38s' :
+                score >= 70 ? '0.55s' :
+                score >= 55 ? '0.78s' :
+                score >= 40 ? '1.05s' :
+                '1.45s';
+
+            document.documentElement.style.setProperty('--spin-speed', speed);
+
+            scoreNumber.textContent = `${score} / 100`;
+            scoreBar.style.width = `${score}%`;
+            scoreCores.textContent = `${cores} 核`;
+            scoreMemory.textContent = memory ? `${memory} GB` : '未知';
+            scoreBench.textContent = benchMs ? `${Math.round(benchMs)} ms` : '略過';
+
+            scoreDesc.innerHTML =
+                `裝置評級：<strong style="color: var(--neon-green);">${label}</strong><br>` +
+                `建議模型：<strong style="color: var(--neon-green);">${recommendedModel.text}</strong><br>` +
+                `旋轉速度已依照評分自動調整。`;
+
+            modelSelect.value = recommendedModel.value;
+        }
+
+        async function runTinyWebGPUBenchmark(adapter) {
+            const device = await adapter.requestDevice();
+
+            const dataSize = 1024 * 64;
+            const bufferSize = dataSize * 4;
+
+            const input = device.createBuffer({
+                size: bufferSize,
+                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_DST
+            });
+
+            const output = device.createBuffer({
+                size: bufferSize,
+                usage: GPUBufferUsage.STORAGE | GPUBufferUsage.COPY_SRC
+            });
+
+            const shaderCode = `
+                @group(0) @binding(0) var<storage, read> inputData: array<f32>;
+                @group(0) @binding(1) var<storage, read_write> outputData: array<f32>;
+
+                @compute @workgroup_size(64)
+                fn main(@builtin(global_invocation_id) id: vec3<u32>) {
+                    let i = id.x;
+                    if (i >= ${dataSize}u) {
+                        return;
+                    }
+
+                    var x = inputData[i] + f32(i % 97u) * 0.001;
+                    for (var j = 0u; j < 128u; j = j + 1u) {
+                        x = sin(x) * 1.0001 + cos(x * 0.5);
+                    }
+
+                    outputData[i] = x;
+                }
+            `;
+
+            const module = device.createShaderModule({ code: shaderCode });
+
+            const pipeline = device.createComputePipeline({
+                layout: 'auto',
+                compute: {
+                    module,
+                    entryPoint: 'main'
+                }
+            });
+
+            const bindGroup = device.createBindGroup({
+                layout: pipeline.getBindGroupLayout(0),
+                entries: [
+                    { binding: 0, resource: { buffer: input } },
+                    { binding: 1, resource: { buffer: output } }
+                ]
+            });
+
+            const encoder = device.createCommandEncoder();
+            const pass = encoder.beginComputePass();
+            pass.setPipeline(pipeline);
+            pass.setBindGroup(0, bindGroup);
+            pass.dispatchWorkgroups(Math.ceil(dataSize / 64));
+            pass.end();
+
+            const start = performance.now();
+            device.queue.submit([encoder.finish()]);
+            await device.queue.onSubmittedWorkDone();
+            const end = performance.now();
+
+            if (typeof device.destroy === 'function') {
+                device.destroy();
+            }
+
+            return end - start;
+        }
+
+        function calculateScore({ cores, memory, benchMs }) {
+            let score = 35;
+
+            score += clamp(cores * 3.2, 4, 30);
+
+            if (memory >= 16) score += 18;
+            else if (memory >= 8) score += 14;
+            else if (memory >= 4) score += 8;
+            else if (memory > 0) score += 4;
+            else score += 6;
+
+            if (benchMs) {
+                if (benchMs < 12) score += 22;
+                else if (benchMs < 25) score += 18;
+                else if (benchMs < 45) score += 13;
+                else if (benchMs < 80) score += 8;
+                else score += 3;
+            } else {
+                score += 8;
+            }
+
+            return clamp(Math.round(score), 1, 100);
+        }
+
+        function getRecommendation(score) {
+            if (score >= 85) {
+                return {
+                    label: '高效能',
+                    recommendedModel: {
+                        text: 'Whisper-Small，可嘗試更高精準度',
+                        value: 'Xenova/whisper-small'
+                    }
+                };
+            }
+
+            if (score >= 55) {
+                return {
+                    label: '中高效能',
+                    recommendedModel: {
+                        text: 'Whisper-Base，速度與精準度平衡',
+                        value: 'Xenova/whisper-base'
+                    }
+                };
+            }
+
+            return {
+                label: '基礎效能',
+                recommendedModel: {
+                    text: 'Whisper-Tiny，優先確保速度',
+                    value: 'Xenova/whisper-tiny'
+                }
+            };
+        }
+
+        async function checkWebGPUAndScore() {
             if (!window.isSecureContext) {
                 failWebGPU('❌ WebGPU 需要 HTTPS 安全環境。<br>請把網站放在 GitHub Pages，或使用 https:// 網址開啟。');
                 return false;
@@ -321,14 +597,42 @@
                 }
 
                 console.log('WebGPU adapter:', adapter);
+                log('WebGPU 檢查成功，開始進行簡易效能評分...');
+
+                const cores = navigator.hardwareConcurrency || 2;
+                const memory = navigator.deviceMemory || 0;
+
+                let benchMs = null;
+                try {
+                    benchMs = await runTinyWebGPUBenchmark(adapter);
+                } catch (benchError) {
+                    console.warn('WebGPU benchmark 失敗，改用硬體資訊估分：', benchError);
+                    log('WebGPU 小測試無法執行，改用硬體資訊估分。');
+                }
+
+                const score = calculateScore({ cores, memory, benchMs });
+                const { label, recommendedModel } = getRecommendation(score);
+
+                applyScoreToUI({
+                    score,
+                    cores,
+                    memory,
+                    benchMs,
+                    recommendedModel,
+                    label
+                });
 
                 statusBox.className = 'webgpu-status ok';
-                statusBox.innerHTML = '✅ WebGPU 可用。<br>目前將使用 WebGPU 模式執行語音轉文字。';
+                statusBox.innerHTML =
+                    `✅ WebGPU 可用。<br>` +
+                    `目前效能評分：<strong>${score} / 100</strong>（${label}）<br>` +
+                    `已自動建議模型：<strong>${recommendedModel.text}</strong>`;
 
                 startBtn.disabled = false;
                 startBtn.textContent = '⚡ 開始 AI 匹配任務';
                 statusHeader.textContent = 'WebGPU 準備完成';
-                log('WebGPU 檢查成功，正在載入 app.js...');
+                log(`效能評分：${score}/100；建議模型：${recommendedModel.text}`);
+                log('正在載入 app.js...');
 
                 return true;
 
@@ -339,7 +643,7 @@
             }
         }
 
-        const ok = await checkWebGPU();
+        const ok = await checkWebGPUAndScore();
 
         if (ok) {
             await import('./app.js');
