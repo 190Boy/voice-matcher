@@ -3,15 +3,17 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 語音自動配對工具 - 專業版</title>
+    <title>AI 語音自動配對工具 - WebGPU 專用版</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
-    
+
     <style>
         :root {
             --neon-green: #00ffcc;
             --bg-dark: #0d1117;
             --card-bg: rgba(22, 27, 34, 0.8);
+            --danger: #ff6b6b;
+            --warning: #ffd166;
         }
 
         body {
@@ -54,7 +56,33 @@
             color: var(--neon-green);
         }
 
-        /* 工作模式區塊 */
+        .webgpu-status {
+            margin: 18px 0 26px;
+            padding: 14px 16px;
+            border-radius: 10px;
+            background: rgba(0, 0, 0, 0.35);
+            border: 1px solid rgba(0, 255, 204, 0.3);
+            line-height: 1.7;
+            font-size: 14px;
+        }
+
+        .webgpu-status.ok {
+            color: var(--neon-green);
+            border-color: rgba(0, 255, 204, 0.75);
+            box-shadow: 0 0 14px rgba(0, 255, 204, 0.12);
+        }
+
+        .webgpu-status.fail {
+            color: var(--danger);
+            border-color: rgba(255, 107, 107, 0.8);
+            box-shadow: 0 0 14px rgba(255, 107, 107, 0.12);
+        }
+
+        .webgpu-status.checking {
+            color: var(--warning);
+            border-color: rgba(255, 209, 102, 0.65);
+        }
+
         .mode-container {
             background: rgba(0, 0, 0, 0.4);
             padding: 20px;
@@ -82,7 +110,6 @@
             margin-right: 10px;
         }
 
-        /* 下拉選單樣式 */
         select {
             width: 100%;
             padding: 12px;
@@ -96,7 +123,6 @@
             box-shadow: 0 0 10px rgba(0, 255, 204, 0.1);
         }
 
-        /* 檔案上傳外框 */
         .file-input-wrapper {
             border: 2px dashed rgba(0, 255, 204, 0.3);
             padding: 20px;
@@ -140,9 +166,9 @@
             border-color: #484f58;
             color: #484f58;
             cursor: not-allowed;
+            box-shadow: none;
         }
 
-        /* 進度條與狀態 */
         #statusHeader {
             margin-top: 30px;
             text-align: center;
@@ -196,6 +222,10 @@
     <div class="container">
         <h1>🎙️ AI Audio Lab</h1>
 
+        <div id="webgpuStatus" class="webgpu-status checking">
+            正在檢查 WebGPU 支援狀態...
+        </div>
+
         <div class="form-group">
             <label>1. 選擇工作模式</label>
             <div class="mode-container">
@@ -235,10 +265,10 @@
             </div>
         </div>
 
-        <button id="startBtn">⚡ 開始 AI 匹配任務</button>
+        <button id="startBtn" disabled>正在檢查 WebGPU...</button>
 
         <h3 id="statusHeader">等待操作中...</h3>
-        
+
         <div id="progressWrapper">
             <div id="progressBar"></div>
         </div>
@@ -248,6 +278,72 @@
         <div id="resultSection" style="text-align: center;"></div>
     </div>
 
-    <script type="module" src="app.js"></script>
+    <script type="module">
+        const statusBox = document.getElementById('webgpuStatus');
+        const startBtn = document.getElementById('startBtn');
+        const statusHeader = document.getElementById('statusHeader');
+        const statusLog = document.getElementById('statusLog');
+
+        function log(message) {
+            const time = new Date().toLocaleTimeString();
+            statusLog.innerHTML += `[${time}] ${message}<br>`;
+            statusLog.scrollTop = statusLog.scrollHeight;
+        }
+
+        function failWebGPU(message) {
+            statusBox.className = 'webgpu-status fail';
+            statusBox.innerHTML = message;
+            startBtn.disabled = true;
+            startBtn.textContent = '此瀏覽器不支援 WebGPU';
+            statusHeader.textContent = 'WebGPU 不可用';
+            log('WebGPU 檢查失敗，已停止載入 app.js。');
+        }
+
+        async function checkWebGPU() {
+            if (!window.isSecureContext) {
+                failWebGPU('❌ WebGPU 需要 HTTPS 安全環境。<br>請把網站放在 GitHub Pages，或使用 https:// 網址開啟。');
+                return false;
+            }
+
+            if (!('gpu' in navigator)) {
+                failWebGPU('❌ 你的瀏覽器沒有 WebGPU API。<br>請使用新版 Chrome / Edge，或支援 WebGPU 的瀏覽器。');
+                return false;
+            }
+
+            try {
+                const adapter = await navigator.gpu.requestAdapter({
+                    powerPreference: 'high-performance'
+                });
+
+                if (!adapter) {
+                    failWebGPU('❌ 找不到可用的 WebGPU GPU Adapter。<br>可能原因：顯示卡或內顯太舊、驅動程式太舊、硬體加速被關閉、遠端桌面或虛擬機環境限制。<br>請使用新版 Chrome / Edge，並確認瀏覽器硬體加速已開啟。');
+                    return false;
+                }
+
+                console.log('WebGPU adapter:', adapter);
+
+                statusBox.className = 'webgpu-status ok';
+                statusBox.innerHTML = '✅ WebGPU 可用。<br>目前將使用 WebGPU 模式執行語音轉文字。';
+
+                startBtn.disabled = false;
+                startBtn.textContent = '⚡ 開始 AI 匹配任務';
+                statusHeader.textContent = 'WebGPU 準備完成';
+                log('WebGPU 檢查成功，正在載入 app.js...');
+
+                return true;
+
+            } catch (error) {
+                console.error('WebGPU 檢查錯誤:', error);
+                failWebGPU('❌ WebGPU 初始化失敗。<br>請使用新版 Chrome / Edge，或更新顯示卡驅動程式。<br>錯誤訊息：' + (error.message || error));
+                return false;
+            }
+        }
+
+        const ok = await checkWebGPU();
+
+        if (ok) {
+            await import('./app.js');
+        }
+    </script>
 </body>
 </html>
