@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>AI 語音自動配對工具 - WebGPU 評分版</title>
+    <title>AI 語音自動配對工具 - WebGPU 評分版 v3</title>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/PapaParse/5.3.2/papaparse.min.js"></script>
     <link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><text y=%22.9em%22 font-size=%2290%22>🎮</text></svg>">
 
@@ -266,7 +266,7 @@
             font-weight: bold;
         }
 
-        #progressWrapper {
+        #taskProgressWrapper {
             display: none;
             height: 10px;
             background: #161b22;
@@ -276,12 +276,25 @@
             border: 1px solid #30363d;
         }
 
-        #progressBar {
+        #taskProgressBar {
             width: 0%;
             height: 100%;
             background: var(--neon-green);
             box-shadow: 0 0 10px var(--neon-green);
             transition: width 0.3s;
+        }
+
+        .model-dots::after {
+            content: "";
+            animation: dots 1.2s steps(4, end) infinite;
+        }
+
+        @keyframes dots {
+            0% { content: ""; }
+            25% { content: "."; }
+            50% { content: ".."; }
+            75% { content: "..."; }
+            100% { content: ""; }
         }
 
         #statusLog {
@@ -379,11 +392,15 @@
 
         <h3 id="statusHeader">等待操作中...</h3>
 
-        <div id="progressWrapper">
-            <div id="progressBar"></div>
+        <div id="modelLoadBox" style="display:none;margin:18px 0;padding:14px 16px;border-radius:10px;border:1px solid rgba(0,255,204,.24);background:rgba(0,0,0,.25);color:#c9d1d9;font-size:13px;line-height:1.7;">
+            <div><strong class="model-dots">模型載入中</strong></div>
+            <div id="modelFileCounter">已完成模型檔案：0 / 0</div>
+            <div id="modelCurrentFile">目前檔案：等待中</div>
+            <div style="color:#8b949e;">模型包含多個檔案與初始化階段，因此不顯示百分比，避免進度倒退或卡在 99%。</div>
         </div>
-        <div id="progressNote" style="display:none;color:#8b949e;font-size:12px;line-height:1.6;margin-top:-10px;margin-bottom:14px;text-align:center;">
-            模型下載包含多個檔案，此處顯示估算總進度，進度只會向前不會倒退。
+
+        <div id="taskProgressWrapper">
+            <div id="taskProgressBar"></div>
         </div>
 
         <div id="statusLog"></div>
@@ -406,8 +423,6 @@
         const scoreBench = document.getElementById('scoreBench');
         const modelSelect = document.getElementById('modelSelect');
 
-        window.__AUDIO_LAB_PERF__ = null;
-
         function log(message) {
             const time = new Date().toLocaleTimeString();
             statusLog.innerHTML += `[${time}] ${message}<br>`;
@@ -427,8 +442,9 @@
             return Math.max(min, Math.min(max, value));
         }
 
+        modelSelect.addEventListener('change', () => { modelSelect.dataset.userTouched = '1'; });
+
         function applyScoreToUI({ score, cores, memory, benchMs, recommendedModel, label }) {
-            window.__AUDIO_LAB_PERF__ = { score, cores, memory, benchMs, recommendedModel, label };
             scorePanel.style.display = 'block';
 
             const speed =
@@ -449,17 +465,12 @@
             scoreDesc.innerHTML =
                 `裝置評級：<strong style="color: var(--neon-green);">${label}</strong><br>` +
                 `建議模型：<strong style="color: var(--neon-green);">${recommendedModel.text}</strong><br>` +
-                `旋轉速度已依照評分自動調整。`;
+                `此評分只在進入頁面時產生，語音任務進度不會再改動它。`;
 
-            modelSelect.value = recommendedModel.value;
-        }
-
-
-        window.__restoreAudioLabScore = function () {
-            if (window.__AUDIO_LAB_PERF__) {
-                applyScoreToUI(window.__AUDIO_LAB_PERF__);
+            if (!modelSelect.dataset.userTouched) {
+                modelSelect.value = recommendedModel.value;
             }
-        };
+        }
 
         async function runTinyWebGPUBenchmark(adapter) {
             const device = await adapter.requestDevice();

@@ -1,5 +1,6 @@
-// WebGPU 專用版 app.js
-// 重點：只使用 WebGPU，不 fallback 到 WASM。
+// WebGPU 專用版 app.js v3
+// 模型下載不顯示百分比，改用「完成檔案數 / 已偵測檔案數」。
+// 硬體評分區和語音任務進度完全分離，避免跑完後評分變成任務進度。
 
 import { pipeline, env } from 'https://cdn.jsdelivr.net/npm/@huggingface/transformers@3.8.1';
 import stringSimilarity from 'https://esm.sh/string-similarity@4.0.2';
@@ -14,10 +15,13 @@ const folderFileInput = document.getElementById('folderFile');
 const startBtn = document.getElementById('startBtn');
 const statusHeader = document.getElementById('statusHeader');
 const statusLog = document.getElementById('statusLog');
-const progressBar = document.getElementById('progressBar');
-const progressWrapper = document.getElementById('progressWrapper');
-const progressNote = document.getElementById('progressNote');
+const taskProgressBar = document.getElementById('taskProgressBar');
+const taskProgressWrapper = document.getElementById('taskProgressWrapper');
 const resultSection = document.getElementById('resultSection');
+
+const modelLoadBox = document.getElementById('modelLoadBox');
+const modelFileCounter = document.getElementById('modelFileCounter');
+const modelCurrentFile = document.getElementById('modelCurrentFile');
 
 const modeA = document.getElementById('modeA');
 const modeB = document.getElementById('modeB');
@@ -48,100 +52,109 @@ function log(msg) {
     statusLog.prepend(div);
 }
 
-function updateProgress(percent) {
+function updateTaskProgress(percent) {
     const safePercent = Math.max(0, Math.min(100, Number(percent) || 0));
-    progressWrapper.style.display = 'block';
-    progressBar.style.width = `${safePercent}%`;
+    taskProgressWrapper.style.display = 'block';
+    taskProgressBar.style.width = `${safePercent}%`;
+}
+
+function resetTaskProgress() {
+    taskProgressWrapper.style.display = 'none';
+    taskProgressBar.style.width = '0%';
+}
+
+function showModelLoadBox() {
+    if (modelLoadBox) modelLoadBox.style.display = 'block';
+}
+
+function hideModelLoadBox() {
+    if (modelLoadBox) modelLoadBox.style.display = 'none';
+}
+
+function setModelCounter(done, total) {
+    if (modelFileCounter) modelFileCounter.textContent = `已完成模型檔案：${done} / ${total}`;
+}
+
+function setCurrentFile(text) {
+    if (modelCurrentFile) modelCurrentFile.textContent = `目前檔案：${text}`;
 }
 
 function setStatus(text) {
     statusHeader.textContent = text;
 }
 
-function setProgressNote(text, visible = true) {
-    if (!progressNote) return;
-    progressNote.textContent = text;
-    progressNote.style.display = visible ? 'block' : 'none';
+function resolveModelName(selectedModel) {
+    return MODEL_MAP[selectedModel] || selectedModel;
 }
 
-function createMonotonicModelProgress() {
-    const resources = new Map();
-    let displayed = 0;
+function getResourceName(info) {
+    const raw =
+        info.file ||
+        info.name ||
+        info.url ||
+        info.key ||
+        info.status ||
+        '模型資源';
 
-    function getKey(info) {
-        return info.file || info.name || info.url || info.key || info.status || '模型資源';
+    return String(raw).split('/').pop() || String(raw);
+}
+
+function createFileCountProgress() {
+    const files = new Map();
+
+    function render(currentName = '初始化中') {
+        const all = Array.from(files.values());
+        const total = all.length;
+        const done = all.filter(item => item.done).length;
+
+        setModelCounter(done, total);
+        setCurrentFile(currentName);
+
+        if (total === 0) {
+            setStatus('⏳ 正在準備模型資源...');
+        } else {
+            setStatus(`⏳ 載入模型檔案中... ${done} / ${total}`);
+        }
     }
 
     return function onProgress(info) {
         console.log('模型載入進度:', info);
 
         if (info.status === 'ready') {
-            displayed = 100;
-            updateProgress(100);
+            for (const item of files.values()) item.done = true;
+            render('模型初始化完成');
             setStatus('✅ WebGPU 模型已就緒，準備開始辨識。');
-            setProgressNote('模型載入完成。', false);
             return;
+        }
+
+        const name = getResourceName(info);
+
+        if (!files.has(name)) {
+            files.set(name, { done: false });
         }
 
         if (info.status === 'progress') {
-            const key = getKey(info);
+            const progress = typeof info.progress === 'number' ? info.progress : null;
+            const loaded = typeof info.loaded === 'number' ? info.loaded : null;
+            const total = typeof info.total === 'number' ? info.total : null;
 
-            let current = null;
-            let total = null;
-
-            if (typeof info.loaded === 'number' && typeof info.total === 'number' && info.total > 0) {
-                current = info.loaded;
-                total = info.total;
-            } else if (typeof info.progress === 'number') {
-                // Transformers.js 常見 progress 是「單一檔案 0~100 進度」，
-                // 所以這裡自己做估算總進度，而且不允許倒退。
-                current = Math.max(0, Math.min(100, info.progress));
-                total = 100;
+            if (
+                (progress !== null && progress >= 99.9) ||
+                (loaded !== null && total !== null && total > 0 && loaded >= total)
+            ) {
+                files.get(name).done = true;
             }
 
-            if (current !== null && total !== null) {
-                const previous = resources.get(key) || { current: 0, total };
-                resources.set(key, {
-                    current: Math.max(previous.current || 0, current),
-                    total: Math.max(previous.total || total, total)
-                });
-
-                let sumCurrent = 0;
-                let sumTotal = 0;
-
-                for (const item of resources.values()) {
-                    sumCurrent += item.current;
-                    sumTotal += item.total;
-                }
-
-                let estimated = sumTotal > 0 ? Math.round((sumCurrent / sumTotal) * 100) : 0;
-
-                // 進度不允許倒退；最多先顯示到 99，ready 後才 100。
-                estimated = Math.min(99, estimated);
-                displayed = Math.max(displayed, estimated);
-
-                updateProgress(displayed);
-                setStatus(`⏳ 下載模型資源中... ${displayed}%`);
-                setProgressNote(`目前檔案：${key}。此為估算總進度，已避免進度倒退。`);
-                return;
-            }
-
-            displayed = Math.max(displayed, 3);
-            updateProgress(displayed);
-            setStatus('⏳ 正在準備模型資源...');
-            setProgressNote(`目前狀態：${key}。此階段可能無法取得精準百分比。`);
+            render(name);
             return;
         }
 
-        if (info.status) {
-            setStatus(`⏳ 模型載入中：${info.status}`);
-            setProgressNote('模型包含多個檔案與初始化階段，部分階段沒有精準百分比。');
+        if (info.status === 'done' || info.status === 'cached') {
+            files.get(name).done = true;
         }
-    };
-}
 
-function resolveModelName(selectedModel) {
-    return MODEL_MAP[selectedModel] || selectedModel;
+        render(name);
+    };
 }
 
 async function ensureWebGPU() {
@@ -170,8 +183,7 @@ async function createWebGPUTranscriber(modelName) {
 
     if (cachedTranscriber && cachedModelName === modelName) {
         log(`沿用已載入模型：${modelName}`);
-        updateProgress(100);
-        setProgressNote('模型已在本次頁面中載入過，直接沿用快取。', false);
+        hideModelLoadBox();
         return cachedTranscriber;
     }
 
@@ -180,18 +192,26 @@ async function createWebGPUTranscriber(modelName) {
 
     setStatus(`🤖 正在載入 WebGPU AI 模型 (${modelName})...`);
     log(`使用 WebGPU 載入模型：${modelName}`);
-    updateProgress(0);
-    setProgressNote('模型下載包含多個檔案，進度會以估算總進度顯示。');
+    resetTaskProgress();
+
+    showModelLoadBox();
+    setModelCounter(0, 0);
+    setCurrentFile('等待下載資訊');
 
     const transcriber = await pipeline('automatic-speech-recognition', modelName, {
         device: 'webgpu',
-        progress_callback: createMonotonicModelProgress()
+        progress_callback: createFileCountProgress()
     });
 
     cachedTranscriber = transcriber;
     cachedModelName = modelName;
 
-    setProgressNote('模型載入完成。', false);
+    setStatus('✅ WebGPU 模型已就緒，準備開始辨識。');
+
+    setTimeout(() => {
+        hideModelLoadBox();
+    }, 600);
+
     log('WebGPU 模型載入完成。');
     return transcriber;
 }
@@ -263,16 +283,12 @@ startBtn.addEventListener('click', async () => {
     startBtn.disabled = true;
     resultSection.innerHTML = '';
     statusLog.innerHTML = '';
-    updateProgress(0);
+    resetTaskProgress();
 
     let textList = [];
     const matchResults = [];
 
     try {
-        if (typeof window.__restoreAudioLabScore === 'function') {
-            window.__restoreAudioLabScore();
-        }
-
         log('目前加速模式：WebGPU');
         log(`使用模型：${modelName}`);
 
@@ -290,7 +306,7 @@ startBtn.addEventListener('click', async () => {
         const transcriber = await createWebGPUTranscriber(modelName);
 
         setStatus('📁 讀取資料夾音檔...');
-        setProgressNote('模型載入完成，接下來進度代表音檔處理進度。');
+        hideModelLoadBox();
         const audioFiles = getAudioFiles(folderFileInput.files);
 
         if (audioFiles.length === 0) {
@@ -341,28 +357,21 @@ startBtn.addEventListener('click', async () => {
                 });
             }
 
-            updateProgress(((i + 1) / audioFiles.length) * 100);
+            updateTaskProgress(((i + 1) / audioFiles.length) * 100);
         }
 
         setStatus('🎉 任務完成！');
-        setProgressNote('全部音檔處理完成。', false);
+        hideModelLoadBox();
         log('全部音檔處理完成。');
         makeCsvDownload(matchResults);
-
-        if (typeof window.__restoreAudioLabScore === 'function') {
-            window.__restoreAudioLabScore();
-        }
 
     } catch (err) {
         console.error(err);
         setStatus('❌ 發生錯誤');
-        setProgressNote('處理中斷，請查看下方日誌或 F12 Console。');
+        hideModelLoadBox();
         log(err.message || String(err));
         log('此版本為 WebGPU 專用版，不會改用 WASM。');
 
-        if (typeof window.__restoreAudioLabScore === 'function') {
-            window.__restoreAudioLabScore();
-        }
     } finally {
         startBtn.disabled = false;
     }
