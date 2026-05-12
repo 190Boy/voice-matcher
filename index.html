@@ -382,6 +382,9 @@
         <div id="progressWrapper">
             <div id="progressBar"></div>
         </div>
+        <div id="progressNote" style="display:none;color:#8b949e;font-size:12px;line-height:1.6;margin-top:-10px;margin-bottom:14px;text-align:center;">
+            模型下載包含多個檔案，此處顯示估算總進度，進度只會向前不會倒退。
+        </div>
 
         <div id="statusLog"></div>
 
@@ -403,6 +406,8 @@
         const scoreBench = document.getElementById('scoreBench');
         const modelSelect = document.getElementById('modelSelect');
 
+        window.__AUDIO_LAB_PERF__ = null;
+
         function log(message) {
             const time = new Date().toLocaleTimeString();
             statusLog.innerHTML += `[${time}] ${message}<br>`;
@@ -423,6 +428,7 @@
         }
 
         function applyScoreToUI({ score, cores, memory, benchMs, recommendedModel, label }) {
+            window.__AUDIO_LAB_PERF__ = { score, cores, memory, benchMs, recommendedModel, label };
             scorePanel.style.display = 'block';
 
             const speed =
@@ -447,6 +453,13 @@
 
             modelSelect.value = recommendedModel.value;
         }
+
+
+        window.__restoreAudioLabScore = function () {
+            if (window.__AUDIO_LAB_PERF__) {
+                applyScoreToUI(window.__AUDIO_LAB_PERF__);
+            }
+        };
 
         async function runTinyWebGPUBenchmark(adapter) {
             const device = await adapter.requestDevice();
