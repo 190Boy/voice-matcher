@@ -341,11 +341,11 @@ startBtn.addEventListener('click', async () => {
                 const score = Math.round(match.bestMatch.rating * 100);
 
                 matchResults.push({
-                    '匹配文本': match.bestMatch.target,
-                    '語音檔名': score < 20 ? '' : fileName,
+                    '匹配文本': score < 20 ? '' : match.bestMatch.target,
+                    '語音檔名': fileName,
                     '辨識內容': heardText,
                     '置信度': `${score}%`,
-                    '配對狀態': score < 20 ? '低於20%，未自動配對語音檔名' : '已配對',
+                    '配對狀態': score < 20 ? '低於20%，未自動填入匹配文本' : '已配對',
                     '加速模式': 'WebGPU',
                     '模型': modelName
                 });
